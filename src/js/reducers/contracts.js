@@ -9,8 +9,7 @@ export class ContractsReducer {
       this.removeContract(data, state);
       this.contracts(data, state);
       this.abi(data, state);
-      this.eventLog(data, state);
-      this.history(data, state);
+      this.eventLogs(data, state);
     }
   }
 
@@ -24,13 +23,7 @@ export class ContractsReducer {
   newContract(obj, state) {
     let data = _.get(obj, 'new-contract', false);
     if (data) {
-      const newContract = {
-        name: data.name,
-        address: data.address,
-        abiEvents: JSON.parse(data['abi-events']),
-        specificEvents: data['specific-events'],
-        eventLogs: getUniqueOrderedLogs(data['event-logs'])
-      };
+      const newContract = mapContract(data);
       state.contracts = getOrderedContracts([
         ...state.contracts,
         newContract
@@ -41,6 +34,7 @@ export class ContractsReducer {
   contracts(obj, state) {
     let data = _.get(obj, 'contracts', false);
     if (data) {
+      console.log('event log', data);
       state.contracts = getOrderedContracts(data.map(contract => mapContract(contract)));
     }
   }
@@ -53,41 +47,31 @@ export class ContractsReducer {
     }
   }
 
-  eventLog(obj, state) {
-    let data = _.get(obj, 'event-log', false);
+  eventLogs(obj, state) {
+    let data = _.get(obj, 'event-logs', false);
     if (data) {
-      const eventLog = data;
-      const { existingContracts, currentContract } = splitContracts(state.contracts, eventLog.address);
+      console.log('event logs', data);
+      const eventLogs = data;
+      if (!eventLogs || !eventLogs[0].address) {
+        console.error('no address found in event logs');
+        return;
+      }
+      const address = eventLogs[0].address;
+      const { existingContracts, currentContract } = splitContracts(state.contracts, address);
       if (currentContract) {
-        this.setContractsState(state, existingContracts, currentContract, eventLog)
+        this.setContractsState(state, existingContracts, currentContract, eventLogs)
       }
     }
   }
 
-  setContractsState(state, existingContracts, currentContract, eventLog, unique) {
+  setContractsState(state, existingContracts, currentContract, eventLogs) {
     const currentLogs = currentContract.eventLogs || []
-    const logs = [...currentLogs, eventLog];
+    const logs = [...currentLogs, ...eventLogs];
 
     const updatedContract = {
       ...currentContract,
       eventLogs: getOrderedLogs(logs)
     };
     state.contracts = getOrderedContracts([...existingContracts, updatedContract]);
-  }
-
-  history(obj, state) {
-    let history = _.get(obj, 'history', false);
-    if (history && history[0].address) {
-      const address = history[0].address;
-
-      const { existingContracts, currentContract } = splitContracts(state.contracts, address);
-      const updatedContract = {
-        ...currentContract,
-        eventLogs: getUniqueOrderedLogs(history)
-      };
-      if (currentContract) {
-        state.contracts = getOrderedContracts([...existingContracts, updatedContract]);
-      }
-    }
   }
 }
